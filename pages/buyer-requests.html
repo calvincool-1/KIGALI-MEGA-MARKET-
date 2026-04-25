@@ -18,8 +18,8 @@
                 <h1>🛒 Kigali Mega Market</h1>
             </div>
             <div class="nav-links">
-                <a href="buyer-dashboard.html">Marketplace</a>
-                <a href="buyer-requests.html">My Requests</a>
+                <a href="buyer-dashboard.html" data-route="buyer-dashboard">Marketplace</a>
+                <a href="buyer-requests.html" data-route="buyer-requests">My Requests</a>
                 <span id="userName"></span>
                 <button onclick="logout()" class="btn-secondary btn-small">Logout</button>
             </div>
@@ -39,18 +39,19 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <script type="module">
+        import '../js/routes.js';
         import firebaseConfig from '../config/firebase.js';
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const db = firebase.database();
 
         window.logout = () => {
-            auth.signOut().then(() => window.location.href = '../index.html');
+            auth.signOut().then(() => window.appRoutes.navigateTo('home'));
         };
 
         auth.onAuthStateChanged(async (user) => {
             if (!user) {
-                window.location.href = 'login.html';
+                window.appRoutes.navigateTo('login');
                 return;
             }
 
@@ -77,7 +78,8 @@
             const container = document.getElementById('requestsContainer');
             
             if (requests.length === 0) {
-                container.innerHTML = '<p>You haven\'t created any requests yet. <a href="buyer-dashboard.html">Create your first request</a></p>';
+                const createRequestUrl = window.appRoutes.resolveRoute('buyer-dashboard');
+                container.innerHTML = `<p>You haven't created any requests yet. <a href="${createRequestUrl}">Create your first request</a></p>`;
                 return;
             }
 

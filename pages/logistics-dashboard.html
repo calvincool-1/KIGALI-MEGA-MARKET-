@@ -61,6 +61,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <script type="module">
+        import '../js/routes.js';
         import firebaseConfig from '../config/firebase.js';
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
@@ -69,12 +70,12 @@
         let currentUser = null;
 
         window.logout = () => {
-            auth.signOut().then(() => window.location.href = '../index.html');
+            auth.signOut().then(() => window.appRoutes.navigateTo('home'));
         };
 
         auth.onAuthStateChanged(async (user) => {
             if (!user) {
-                window.location.href = 'login.html';
+                window.appRoutes.navigateTo('login');
                 return;
             }
 
@@ -82,7 +83,7 @@
             currentUser = snapshot.val();
             
             if (currentUser.userType !== 'logistics') {
-                window.location.href = 'login.html';
+                window.appRoutes.navigateTo('login');
                 return;
             }
 

@@ -22,6 +22,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <script type="module">
+        import '../js/routes.js';
         import firebaseConfig from '../config/firebase.js';
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
@@ -69,7 +70,8 @@
                 const categories = ['electronics', 'fashion', 'food', 'home', 'beauty', 'other'];
                 statusDiv.innerHTML += '<div class="alert alert-success">✓ Categories configured</div>';
                 
-                statusDiv.innerHTML += '<div class="alert alert-success"><strong>Setup Complete!</strong><br>You can now <a href="login.html">login</a> with the admin credentials.</div>';
+                const loginUrl = window.appRoutes.resolveRoute('login');
+                statusDiv.innerHTML += `<div class="alert alert-success"><strong>Setup Complete!</strong><br>You can now <a href="${loginUrl}">login</a> with the admin credentials.</div>`;
                 
                 await auth.signOut();
                 

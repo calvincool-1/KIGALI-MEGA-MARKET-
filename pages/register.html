@@ -182,11 +182,11 @@
             </form>
 
             <p class="text-center mt-2">
-                Already have an account? <a href="login.html">Login here</a>
+                Already have an account? <a href="login.html" data-route="login">Login here</a>
             </p>
             
             <p class="text-center" style="margin-top: 1rem;">
-                <a href="../index.html" style="color: var(--gray);">← Back to Home</a>
+                <a href="../index.html" data-route="home" style="color: var(--gray);">← Back to Home</a>
             </p>
         </div>
     </div>
@@ -370,7 +370,7 @@
                 
                 // Redirect to login after delay
                 setTimeout(() => {
-                    window.location.href = 'login.html';
+                    window.appRoutes.navigateTo('login');
                 }, 3000);
                 
             } catch (error) {
@@ -381,9 +381,17 @@
         });
         
         // Clear errors on input
-        ['fullName', 'email', 'phone', 'password', 'confirmPassword'].forEach(fieldId => {
+        const fieldErrorMap = {
+            fullName: 'nameError',
+            email: 'emailError',
+            phone: 'phoneError',
+            password: 'passwordError',
+            confirmPassword: 'confirmPasswordError'
+        };
+
+        Object.entries(fieldErrorMap).forEach(([fieldId, errorId]) => {
             document.getElementById(fieldId).addEventListener('input', () => {
-                document.getElementById(fieldId + 'Error').classList.remove('show');
+                document.getElementById(errorId).classList.remove('show');
             });
         });
     </script>

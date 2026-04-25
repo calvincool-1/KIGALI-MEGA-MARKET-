@@ -67,6 +67,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <script type="module">
+        import '../js/routes.js';
         import firebaseConfig from '../config/firebase.js';
         
         firebase.initializeApp(firebaseConfig);
@@ -292,6 +293,8 @@
             reportDiv.classList.remove('hidden');
 
             if (failedTests === 0) {
+                const loginUrl = window.appRoutes.resolveRoute('login');
+                const homeUrl = window.appRoutes.resolveRoute('home');
                 contentDiv.innerHTML = `
                     <div class="alert alert-success">
                         <h3>✅ ALL TESTS PASSED!</h3>
@@ -319,8 +322,8 @@
                         <p>Your Kigali Mega Market system is fully functional and ready to use.</p>
                         
                         <div style="margin-top: 1rem;">
-                            <a href="../pages/login.html" class="btn-primary">Go to Login</a>
-                            <a href="../index.html" class="btn-secondary">Go to Home</a>
+                            <a href="${loginUrl}" class="btn-primary">Go to Login</a>
+                            <a href="${homeUrl}" class="btn-secondary">Go to Home</a>
                         </div>
                     </div>
                 `;
