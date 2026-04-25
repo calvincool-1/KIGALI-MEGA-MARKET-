@@ -15,7 +15,7 @@
             padding: 2rem 0;
         }
         .auth-card {
-            max-width: 500px;
+            max-width: 550px;
             width: 100%;
             background: var(--white);
             padding: 2rem;
@@ -30,6 +30,41 @@
             color: var(--primary-color);
             margin-bottom: 0.5rem;
         }
+        .form-error {
+            color: var(--danger-color);
+            font-size: 0.875rem;
+            margin-top: 0.25rem;
+            display: none;
+        }
+        .form-error.show {
+            display: block;
+        }
+        .role-cards {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .role-card {
+            border: 2px solid var(--light-gray);
+            border-radius: var(--border-radius);
+            padding: 1rem;
+            text-align: center;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        .role-card:hover {
+            border-color: var(--primary-color);
+            background: #f0f7ff;
+        }
+        .role-card.selected {
+            border-color: var(--primary-color);
+            background: #e3f2fd;
+        }
+        .role-card .icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
     </style>
 </head>
 <body>
@@ -38,132 +73,318 @@
             <div class="auth-header">
                 <h1>🛒 Kigali Mega Market</h1>
                 <h2>Create Account</h2>
+                <p style="color: var(--gray);">Join our marketplace today</p>
             </div>
             
-            <form id="registerForm">
+            <form id="registerForm" novalidate>
+                <!-- Role Selection -->
                 <div class="form-group">
-                    <label>Account Type</label>
-                    <select id="userType" class="form-control" required>
-                        <option value="">Select account type</option>
-                        <option value="buyer">Buyer</option>
-                        <option value="seller">Seller</option>
-                    </select>
+                    <label>Select Account Type</label>
+                    <div class="role-cards">
+                        <div class="role-card" data-role="buyer">
+                            <div class="icon">🛍️</div>
+                            <strong>Buyer</strong>
+                            <p style="font-size: 0.85rem; color: var(--gray); margin-top: 0.25rem;">Browse and request products</p>
+                        </div>
+                        <div class="role-card" data-role="seller">
+                            <div class="icon">🏪</div>
+                            <strong>Seller</strong>
+                            <p style="font-size: 0.85rem; color: var(--gray); margin-top: 0.25rem;">Sell your products</p>
+                        </div>
+                    </div>
+                    <input type="hidden" id="userType" required>
+                    <div class="form-error" id="roleError"></div>
+                </div>
+
+                <!-- Basic Information -->
+                <div class="form-group">
+                    <label for="fullName">Full Name</label>
+                    <input 
+                        type="text" 
+                        id="fullName" 
+                        class="form-control" 
+                        required
+                        placeholder="Enter your full name">
+                    <div class="form-error" id="nameError"></div>
                 </div>
 
                 <div class="form-group">
-                    <label>Full Name</label>
-                    <input type="text" id="fullName" class="form-control" required>
+                    <label for="email">Email Address</label>
+                    <input 
+                        type="email" 
+                        id="email" 
+                        class="form-control" 
+                        required
+                        autocomplete="email"
+                        placeholder="Enter your email">
+                    <div class="form-error" id="emailError"></div>
                 </div>
 
                 <div class="form-group">
-                    <label>Email</label>
-                    <input type="email" id="email" class="form-control" required>
+                    <label for="phone">Phone Number</label>
+                    <input 
+                        type="tel" 
+                        id="phone" 
+                        class="form-control" 
+                        required
+                        placeholder="+250 7XX XXX XXX">
+                    <div class="form-error" id="phoneError"></div>
                 </div>
 
                 <div class="form-group">
-                    <label>Phone Number</label>
-                    <input type="tel" id="phone" class="form-control" required>
+                    <label for="password">Password</label>
+                    <input 
+                        type="password" 
+                        id="password" 
+                        class="form-control" 
+                        required
+                        autocomplete="new-password"
+                        placeholder="At least 6 characters"
+                        minlength="6">
+                    <div class="form-error" id="passwordError"></div>
                 </div>
 
                 <div class="form-group">
-                    <label>Password</label>
-                    <input type="password" id="password" class="form-control" required minlength="6">
+                    <label for="confirmPassword">Confirm Password</label>
+                    <input 
+                        type="password" 
+                        id="confirmPassword" 
+                        class="form-control" 
+                        required
+                        autocomplete="new-password"
+                        placeholder="Re-enter your password">
+                    <div class="form-error" id="confirmPasswordError"></div>
                 </div>
 
-                <div class="form-group">
-                    <label>Confirm Password</label>
-                    <input type="password" id="confirmPassword" class="form-control" required>
-                </div>
-
+                <!-- Seller-specific fields -->
                 <div id="sellerFields" class="hidden">
                     <div class="form-group">
-                        <label>Business Name</label>
-                        <input type="text" id="businessName" class="form-control">
+                        <label for="businessName">Business Name</label>
+                        <input 
+                            type="text" 
+                            id="businessName" 
+                            class="form-control"
+                            placeholder="Your business name">
                     </div>
                     <div class="form-group">
-                        <label>Business Address</label>
-                        <textarea id="businessAddress" class="form-control"></textarea>
+                        <label for="businessAddress">Business Address</label>
+                        <textarea 
+                            id="businessAddress" 
+                            class="form-control"
+                            rows="2"
+                            placeholder="Your business location"></textarea>
                     </div>
                 </div>
 
-                <button type="submit" class="btn-primary" style="width: 100%;">Register</button>
+                <button type="submit" id="registerBtn" class="btn-primary" style="width: 100%;">
+                    Create Account
+                </button>
             </form>
 
             <p class="text-center mt-2">
                 Already have an account? <a href="login.html">Login here</a>
             </p>
+            
+            <p class="text-center" style="margin-top: 1rem;">
+                <a href="../index.html" style="color: var(--gray);">← Back to Home</a>
+            </p>
         </div>
     </div>
 
+    <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    
+    <!-- Core App Module -->
     <script type="module">
-        import firebaseConfig from '../config/firebase.js';
-        firebase.initializeApp(firebaseConfig);
-        const auth = firebase.auth();
-        const db = firebase.database();
-
-        // Show/hide role-specific fields
-        document.getElementById('userType').addEventListener('change', (e) => {
-            const sellerFields = document.getElementById('sellerFields');
-            
-            sellerFields.classList.add('hidden');
-            
-            if (e.target.value === 'seller') {
-                sellerFields.classList.remove('hidden');
+        import '../js/app.js';
+        
+        // Check if already logged in
+        window.addEventListener('load', async () => {
+            const currentUser = await window.getCurrentUser();
+            if (currentUser) {
+                // Already logged in - redirect to dashboard
+                window.redirectByRole(currentUser.userData.userType);
             }
         });
-
-        // Check URL params for pre-selected type
+        
+        // Role selection
+        document.querySelectorAll('.role-card').forEach(card => {
+            card.addEventListener('click', () => {
+                // Remove selected class from all cards
+                document.querySelectorAll('.role-card').forEach(c => c.classList.remove('selected'));
+                
+                // Add selected class to clicked card
+                card.classList.add('selected');
+                
+                // Set hidden input value
+                const role = card.dataset.role;
+                document.getElementById('userType').value = role;
+                document.getElementById('roleError').classList.remove('show');
+                
+                // Show/hide seller fields
+                const sellerFields = document.getElementById('sellerFields');
+                if (role === 'seller') {
+                    sellerFields.classList.remove('hidden');
+                } else {
+                    sellerFields.classList.add('hidden');
+                }
+            });
+        });
+        
+        // Check URL params for pre-selected role
         const urlParams = new URLSearchParams(window.location.search);
         const typeParam = urlParams.get('type');
         if (typeParam) {
-            document.getElementById('userType').value = typeParam;
-            document.getElementById('userType').dispatchEvent(new Event('change'));
+            const card = document.querySelector(`.role-card[data-role="${typeParam}"]`);
+            if (card) {
+                card.click();
+            }
         }
-
-        // Handle registration
+        
+        // Form validation
+        function validateForm() {
+            let isValid = true;
+            
+            // Role validation
+            const role = document.getElementById('userType').value;
+            const roleError = document.getElementById('roleError');
+            if (!role) {
+                roleError.textContent = 'Please select an account type';
+                roleError.classList.add('show');
+                isValid = false;
+            } else {
+                roleError.classList.remove('show');
+            }
+            
+            // Name validation
+            const fullName = document.getElementById('fullName').value.trim();
+            const nameError = document.getElementById('nameError');
+            if (!fullName) {
+                nameError.textContent = 'Full name is required';
+                nameError.classList.add('show');
+                isValid = false;
+            } else if (fullName.length < 3) {
+                nameError.textContent = 'Name must be at least 3 characters';
+                nameError.classList.add('show');
+                isValid = false;
+            } else {
+                nameError.classList.remove('show');
+            }
+            
+            // Email validation
+            const email = document.getElementById('email').value.trim();
+            const emailError = document.getElementById('emailError');
+            if (!email) {
+                emailError.textContent = 'Email is required';
+                emailError.classList.add('show');
+                isValid = false;
+            } else if (!window.validateEmail(email)) {
+                emailError.textContent = 'Please enter a valid email address';
+                emailError.classList.add('show');
+                isValid = false;
+            } else {
+                emailError.classList.remove('show');
+            }
+            
+            // Phone validation
+            const phone = document.getElementById('phone').value.trim();
+            const phoneError = document.getElementById('phoneError');
+            if (!phone) {
+                phoneError.textContent = 'Phone number is required';
+                phoneError.classList.add('show');
+                isValid = false;
+            } else {
+                phoneError.classList.remove('show');
+            }
+            
+            // Password validation
+            const password = document.getElementById('password').value;
+            const passwordError = document.getElementById('passwordError');
+            if (!password) {
+                passwordError.textContent = 'Password is required';
+                passwordError.classList.add('show');
+                isValid = false;
+            } else if (password.length < 6) {
+                passwordError.textContent = 'Password must be at least 6 characters';
+                passwordError.classList.add('show');
+                isValid = false;
+            } else {
+                passwordError.classList.remove('show');
+            }
+            
+            // Confirm password validation
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            const confirmPasswordError = document.getElementById('confirmPasswordError');
+            if (!confirmPassword) {
+                confirmPasswordError.textContent = 'Please confirm your password';
+                confirmPasswordError.classList.add('show');
+                isValid = false;
+            } else if (password !== confirmPassword) {
+                confirmPasswordError.textContent = 'Passwords do not match';
+                confirmPasswordError.classList.add('show');
+                isValid = false;
+            } else {
+                confirmPasswordError.classList.remove('show');
+            }
+            
+            return isValid;
+        }
+        
+        // Handle registration form submission
         document.getElementById('registerForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
-            const password = document.getElementById('password').value;
-            const confirmPassword = document.getElementById('confirmPassword').value;
-            
-            if (password !== confirmPassword) {
-                alert('Passwords do not match!');
+            // Validate form
+            if (!validateForm()) {
                 return;
             }
-
-            const email = document.getElementById('email').value;
-            const userType = document.getElementById('userType').value;
+            
+            const registerBtn = document.getElementById('registerBtn');
             
             try {
-                const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-                const user = userCredential.user;
+                // Show loading state
+                window.setButtonLoading(registerBtn, true);
                 
+                // Prepare user data
                 const userData = {
-                    uid: user.uid,
-                    email: email,
-                    fullName: document.getElementById('fullName').value,
-                    phone: document.getElementById('phone').value,
-                    userType: userType,
-                    verified: false,
-                    createdAt: Date.now()
+                    email: document.getElementById('email').value.trim(),
+                    password: document.getElementById('password').value,
+                    fullName: document.getElementById('fullName').value.trim(),
+                    phone: document.getElementById('phone').value.trim(),
+                    role: document.getElementById('userType').value
                 };
-
-                if (userType === 'seller') {
-                    userData.businessName = document.getElementById('businessName').value;
-                    userData.businessAddress = document.getElementById('businessAddress').value;
-                }
-
-                await db.ref('users/' + user.uid).set(userData);
                 
-                alert('Registration successful! Please wait for admin verification.');
-                window.location.href = 'login.html';
+                // Add seller-specific data if applicable
+                if (userData.role === 'seller') {
+                    userData.businessName = document.getElementById('businessName').value.trim();
+                    userData.businessAddress = document.getElementById('businessAddress').value.trim();
+                }
+                
+                // Register user
+                await window.registerUser(userData);
+                
+                // Show success message
+                window.showAlert('Registration successful! Please wait for admin verification before logging in.', 'success');
+                
+                // Redirect to login after delay
+                setTimeout(() => {
+                    window.location.href = 'login.html';
+                }, 3000);
+                
             } catch (error) {
-                alert('Error: ' + error.message);
+                // Show error message
+                window.showAlert(error.message, 'error');
+                window.setButtonLoading(registerBtn, false);
             }
+        });
+        
+        // Clear errors on input
+        ['fullName', 'email', 'phone', 'password', 'confirmPassword'].forEach(fieldId => {
+            document.getElementById(fieldId).addEventListener('input', () => {
+                document.getElementById(fieldId + 'Error').classList.remove('show');
+            });
         });
     </script>
 </body>

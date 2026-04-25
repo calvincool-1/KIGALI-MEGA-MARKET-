@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Marketplace - Kigali Mega Market</title>
+    <title>Buyer Dashboard - Kigali Mega Market</title>
     <link rel="stylesheet" href="../css/main.css">
     <style>
         .dashboard { padding: 2rem 0; background: var(--light-gray); min-height: 100vh; }
@@ -16,6 +16,8 @@
         .seller-contact { font-size: 0.85rem; color: var(--gray); margin-top: 0.5rem; }
         .request-card { background: #fef3c7; border-left: 4px solid var(--warning-color); }
         .budget-range { color: var(--secondary-color); font-weight: 600; }
+        .empty-state { text-align: center; padding: 3rem; color: var(--gray); }
+        .empty-state-icon { font-size: 4rem; margin-bottom: 1rem; }
     </style>
 </head>
 <body>
@@ -27,8 +29,8 @@
             <div class="nav-links">
                 <a href="buyer-dashboard.html">Marketplace</a>
                 <a href="buyer-requests.html">My Requests</a>
-                <span id="userName"></span>
-                <button onclick="logout()" class="btn-secondary btn-small">Logout</button>
+                <span id="userName">Loading...</span>
+                <button onclick="window.logoutUser()" class="btn-secondary btn-small">Logout</button>
             </div>
         </div>
     </nav>
@@ -87,75 +89,68 @@
                 <div class="form-group">
                     <label>Budget Range (RWF)</label>
                     <div style="display: flex; gap: 1rem;">
-                        <input type="number" id="minBudget" class="form-control" placeholder="Min" required>
-                        <input type="number" id="maxBudget" class="form-control" placeholder="Max" required>
+                        <input type="number" id="minBudget" class="form-control" placeholder="Min" required min="0">
+                        <input type="number" id="maxBudget" class="form-control" placeholder="Max" required min="0">
                     </div>
                 </div>
                 <div class="form-group">
                     <label>Quantity Required</label>
-                    <input type="number" id="quantity" class="form-control" required min="1">
+                    <input type="number" id="quantity" class="form-control" required min="1" value="1">
                 </div>
-                <button type="submit" class="btn-primary" style="width: 100%;">Submit Request</button>
+                <button type="submit" id="submitRequestBtn" class="btn-primary" style="width: 100%;">Submit Request</button>
             </form>
         </div>
     </div>
 
+    <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    
+    <!-- Core App Module -->
     <script type="module">
-        import firebaseConfig from '../config/firebase.js';
-        firebase.initializeApp(firebaseConfig);
-        const auth = firebase.auth();
-        const db = firebase.database();
-
+        import '../js/app.js';
+        
         let currentUser = null;
-        let cart = [];
-        let allProducts = [];
-
-        window.logout = () => {
-            auth.signOut().then(() => window.location.href = '../index.html');
-        };
-
         let allProducts = [];
         let allRequests = [];
-
-        auth.onAuthStateChanged(async (user) => {
-            if (!user) {
-                window.location.href = 'login.html';
-                return;
+        
+        // Protect page and initialize
+        window.addEventListener('load', async () => {
+            currentUser = await window.protectPage('buyer');
+            if (currentUser) {
+                document.getElementById('userName').textContent = currentUser.userData.fullName;
+                await loadProducts();
+                await loadRequests();
             }
-
-            const snapshot = await db.ref('users/' + user.uid).once('value');
-            const currentUser = snapshot.val();
-            
-            if (currentUser.userType !== 'buyer') {
-                window.location.href = 'login.html';
-                return;
-            }
-
-            document.getElementById('userName').textContent = currentUser.fullName;
-            loadProducts();
-            loadRequests();
         });
-
+        
         // Load approved products
         async function loadProducts() {
-            const snapshot = await db.ref('products').orderByChild('status').equalTo('approved').once('value');
-            allProducts = [];
-            
-            snapshot.forEach((child) => {
-                allProducts.push({ id: child.key, ...child.val() });
-            });
-
-            displayProducts(allProducts);
+            try {
+                const products = await window.queryCollection('products', {
+                    orderBy: 'status',
+                    equalTo: 'approved'
+                });
+                
+                allProducts = products.sort((a, b) => b.createdAt - a.createdAt);
+                displayProducts(allProducts);
+            } catch (error) {
+                console.error('Error loading products:', error);
+                document.getElementById('productsGrid').innerHTML = '<p class="empty-state">Error loading products</p>';
+            }
         }
-
+        
         function displayProducts(products) {
             const grid = document.getElementById('productsGrid');
             
             if (products.length === 0) {
-                grid.innerHTML = '<p>No approved products available yet</p>';
+                grid.innerHTML = `
+                    <div class="empty-state" style="grid-column: 1 / -1;">
+                        <div class="empty-state-icon">📦</div>
+                        <p>No products available yet</p>
+                    </div>
+                `;
                 return;
             }
 
@@ -163,7 +158,7 @@
                 <div class="card product-card">
                     <div class="product-image">${product.imageUrl || '📦'}</div>
                     <div class="product-title">${product.name}</div>
-                    <div class="product-price">${product.price} RWF</div>
+                    <div class="product-price">${window.formatCurrency(product.price)}</div>
                     <p style="font-size: 0.9rem; color: var(--gray);">${product.description}</p>
                     <div class="seller-contact">
                         <strong>Seller:</strong> ${product.sellerName}<br>
@@ -172,35 +167,40 @@
                 </div>
             `).join('');
         }
-
+        
         // Search products
         document.getElementById('searchProducts').addEventListener('input', (e) => {
             const query = e.target.value.toLowerCase();
             const filtered = allProducts.filter(p => 
                 p.name.toLowerCase().includes(query) || 
-                p.description.toLowerCase().includes(query)
+                p.description.toLowerCase().includes(query) ||
+                p.category.toLowerCase().includes(query)
             );
             displayProducts(filtered);
         });
-
+        
         // Load buyer requests
         async function loadRequests() {
-            const snapshot = await db.ref('requests').once('value');
-            allRequests = [];
-            
-            snapshot.forEach((child) => {
-                allRequests.push({ id: child.key, ...child.val() });
-            });
-
-            allRequests.sort((a, b) => b.createdAt - a.createdAt);
-            displayRequests(allRequests);
+            try {
+                const requests = await window.queryCollection('requests');
+                allRequests = requests.sort((a, b) => b.createdAt - a.createdAt);
+                displayRequests(allRequests);
+            } catch (error) {
+                console.error('Error loading requests:', error);
+                document.getElementById('requestsGrid').innerHTML = '<p class="empty-state">Error loading requests</p>';
+            }
         }
-
+        
         function displayRequests(requests) {
             const grid = document.getElementById('requestsGrid');
             
             if (requests.length === 0) {
-                grid.innerHTML = '<p>No product requests yet. Be the first to create one!</p>';
+                grid.innerHTML = `
+                    <div class="empty-state" style="grid-column: 1 / -1;">
+                        <div class="empty-state-icon">🔍</div>
+                        <p>No product requests yet. Be the first to create one!</p>
+                    </div>
+                `;
                 return;
             }
 
@@ -208,10 +208,10 @@
                 <div class="card request-card">
                     <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
                         <span class="badge badge-warning">${request.category}</span>
-                        <small>${new Date(request.createdAt).toLocaleDateString()}</small>
+                        <small>${window.formatDate(request.createdAt)}</small>
                     </div>
                     <p style="font-size: 0.95rem; margin-bottom: 0.5rem;">${request.description}</p>
-                    <div class="budget-range">Budget: ${request.minBudget} - ${request.maxBudget} RWF</div>
+                    <div class="budget-range">Budget: ${window.formatCurrency(request.minBudget)} - ${window.formatCurrency(request.maxBudget)}</div>
                     <p style="font-size: 0.85rem; color: var(--gray);">Quantity: ${request.quantity}</p>
                     <div style="font-size: 0.85rem; color: var(--gray); margin-top: 0.5rem;">
                         <strong>Requested by:</strong> ${request.buyerName}<br>
@@ -220,45 +220,55 @@
                 </div>
             `).join('');
         }
-
+        
         // Show request modal
         window.showRequestModal = () => {
             document.getElementById('requestModal').classList.add('active');
         };
-
+        
         window.closeRequestModal = () => {
             document.getElementById('requestModal').classList.remove('active');
+            document.getElementById('requestForm').reset();
         };
-
+        
         // Submit request
         document.getElementById('requestForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
-            const user = auth.currentUser;
-            const userSnapshot = await db.ref('users/' + user.uid).once('value');
-            const userData = userSnapshot.val();
-
-            const request = {
-                buyerId: user.uid,
-                buyerName: userData.fullName,
-                buyerContact: userData.phone || userData.email,
-                category: document.getElementById('category').value,
-                description: document.getElementById('description').value,
-                minBudget: parseInt(document.getElementById('minBudget').value),
-                maxBudget: parseInt(document.getElementById('maxBudget').value),
-                quantity: parseInt(document.getElementById('quantity').value),
-                status: 'active',
-                createdAt: Date.now()
-            };
-
+            const submitBtn = document.getElementById('submitRequestBtn');
+            
             try {
-                await db.ref('requests').push(request);
-                alert('Request submitted successfully! Sellers can now see your request.');
+                window.setButtonLoading(submitBtn, true);
+                
+                const minBudget = parseInt(document.getElementById('minBudget').value);
+                const maxBudget = parseInt(document.getElementById('maxBudget').value);
+                
+                if (minBudget > maxBudget) {
+                    throw new Error('Minimum budget cannot be greater than maximum budget');
+                }
+                
+                const request = {
+                    buyerId: currentUser.user.uid,
+                    buyerName: currentUser.userData.fullName,
+                    buyerContact: currentUser.userData.phone || currentUser.userData.email,
+                    category: document.getElementById('category').value,
+                    description: document.getElementById('description').value,
+                    minBudget: minBudget,
+                    maxBudget: maxBudget,
+                    quantity: parseInt(document.getElementById('quantity').value),
+                    status: 'active'
+                };
+                
+                await window.createDocument('requests', request);
+                
+                window.showAlert('Request submitted successfully! Sellers can now see your request.', 'success');
                 closeRequestModal();
-                document.getElementById('requestForm').reset();
-                loadRequests();
+                await loadRequests();
+                
             } catch (error) {
-                alert('Error: ' + error.message);
+                window.showAlert(error.message, 'error');
+            } finally {
+                window.setButtonLoading(submitBtn, false);
             }
         });
     </script>

@@ -1,0 +1,80 @@
+{
+  "rules": {
+    "users": {
+      "$uid": {
+        ".read": "auth != null",
+        ".write": "$uid === auth.uid || root.child('users').child(auth.uid).child('userType').val() === 'admin'",
+        ".validate": "newData.hasChildren(['uid', 'email', 'fullName', 'phone', 'userType', 'verified', 'createdAt'])",
+        "uid": {
+          ".validate": "newData.val() === $uid"
+        },
+        "email": {
+          ".validate": "newData.isString() && newData.val().length > 0"
+        },
+        "fullName": {
+          ".validate": "newData.isString() && newData.val().length > 0"
+        },
+        "userType": {
+          ".validate": "newData.isString() && newData.val().matches(/^(buyer|seller|admin)$/)"
+        },
+        "verified": {
+          ".validate": "newData.isBoolean()"
+        }
+      }
+    },
+    "products": {
+      ".read": true,
+      "$productId": {
+        ".write": "auth != null && (
+          root.child('products').child($productId).child('sellerId').val() === auth.uid ||
+          root.child('users').child(auth.uid).child('userType').val() === 'admin'
+        )",
+        ".validate": "newData.hasChildren(['name', 'description', 'price', 'category', 'sellerId', 'sellerName', 'sellerContact', 'status', 'createdAt'])",
+        "name": {
+          ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 100"
+        },
+        "description": {
+          ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 1000"
+        },
+        "price": {
+          ".validate": "newData.isNumber() && newData.val() > 0"
+        },
+        "category": {
+          ".validate": "newData.isString() && newData.val().matches(/^(electronics|fashion|agriculture|furniture|home|beauty|other)$/)"
+        },
+        "sellerId": {
+          ".validate": "newData.isString()"
+        },
+        "status": {
+          ".validate": "newData.isString() && newData.val().matches(/^(pending|approved|rejected)$/)"
+        }
+      }
+    },
+    "requests": {
+      ".read": "auth != null",
+      "$requestId": {
+        ".write": "auth != null && (
+          !data.exists() ||
+          root.child('requests').child($requestId).child('buyerId').val() === auth.uid ||
+          root.child('users').child(auth.uid).child('userType').val() === 'admin'
+        )",
+        ".validate": "newData.hasChildren(['buyerId', 'buyerName', 'buyerContact', 'category', 'description', 'minBudget', 'maxBudget', 'quantity', 'status', 'createdAt'])",
+        "buyerId": {
+          ".validate": "newData.isString()"
+        },
+        "minBudget": {
+          ".validate": "newData.isNumber() && newData.val() >= 0"
+        },
+        "maxBudget": {
+          ".validate": "newData.isNumber() && newData.val() >= newData.parent().child('minBudget').val()"
+        },
+        "quantity": {
+          ".validate": "newData.isNumber() && newData.val() > 0"
+        },
+        "status": {
+          ".validate": "newData.isString() && newData.val() === 'active'"
+        }
+      }
+    }
+  }
+}
