@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Requests - Kigali Mega Market</title>
+    <link rel="stylesheet" href="../css/main.css">
+    <style>
+        .dashboard { padding: 2rem 0; background: var(--light-gray); min-height: 100vh; }
+        .request-card { margin-bottom: 1.5rem; }
+        .request-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 2px solid var(--light-gray); }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <h1>🛒 Kigali Mega Market</h1>
+            </div>
+            <div class="nav-links">
+                <a href="buyer-dashboard.html">Marketplace</a>
+                <a href="buyer-requests.html">My Requests</a>
+                <span id="userName"></span>
+                <button onclick="logout()" class="btn-secondary btn-small">Logout</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="dashboard">
+        <div class="container">
+            <h2>My Product Requests</h2>
+            <div id="requestsContainer">
+                <div class="spinner"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <script type="module">
+        import firebaseConfig from '../config/firebase.js';
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.database();
+
+        window.logout = () => {
+            auth.signOut().then(() => window.location.href = '../index.html');
+        };
+
+        auth.onAuthStateChanged(async (user) => {
+            if (!user) {
+                window.location.href = 'login.html';
+                return;
+            }
+
+            const snapshot = await db.ref('users/' + user.uid).once('value');
+            const userData = snapshot.val();
+            document.getElementById('userName').textContent = userData.fullName;
+            
+            loadMyRequests(user.uid);
+        });
+
+        async function loadMyRequests(userId) {
+            const snapshot = await db.ref('requests').orderByChild('buyerId').equalTo(userId).once('value');
+            const requests = [];
+            
+            snapshot.forEach((child) => {
+                requests.push({ id: child.key, ...child.val() });
+            });
+
+            requests.sort((a, b) => b.createdAt - a.createdAt);
+            displayRequests(requests);
+        }
+
+        function displayRequests(requests) {
+            const container = document.getElementById('requestsContainer');
+            
+            if (requests.length === 0) {
+                container.innerHTML = '<p>You haven\'t created any requests yet. <a href="buyer-dashboard.html">Create your first request</a></p>';
+                return;
+            }
+
+            container.innerHTML = requests.map(request => {
+                const date = new Date(request.createdAt).toLocaleString();
+                
+                return `
+                    <div class="card request-card">
+                        <div class="request-header">
+                            <div>
+                                <span class="badge badge-warning">${request.category}</span>
+                                <small style="margin-left: 1rem;">${date}</small>
+                            </div>
+                            <span class="badge badge-success">${request.status}</span>
+                        </div>
+                        <div>
+                            <p style="font-size: 1rem; margin-bottom: 0.5rem;"><strong>Description:</strong></p>
+                            <p style="margin-bottom: 1rem;">${request.description}</p>
+                            
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                                <div>
+                                    <strong>Budget Range:</strong><br>
+                                    ${request.minBudget} - ${request.maxBudget} RWF
+                                </div>
+                                <div>
+                                    <strong>Quantity:</strong><br>
+                                    ${request.quantity}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+    </script>
+</body>
+</html>

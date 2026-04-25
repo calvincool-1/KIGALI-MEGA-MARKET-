@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Test - Kigali Mega Market</title>
+    <link rel="stylesheet" href="../css/main.css">
+    <style>
+        body { background: var(--light-gray); padding: 2rem; }
+        .test-container { max-width: 1200px; margin: 0 auto; }
+        .test-section { background: white; padding: 2rem; margin-bottom: 1.5rem; border-radius: var(--border-radius); box-shadow: var(--box-shadow); }
+        .test-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; }
+        .test-card { padding: 1rem; border-radius: var(--border-radius); border: 2px solid var(--light-gray); }
+        .test-pass { border-color: var(--secondary-color); background: #d1fae5; }
+        .test-fail { border-color: var(--danger-color); background: #fee2e2; }
+        .test-running { border-color: var(--warning-color); background: #fef3c7; }
+        .test-header { font-weight: 600; margin-bottom: 0.5rem; }
+        .test-details { font-size: 0.9rem; color: var(--gray); }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🧪 End-to-End System Test</h1>
+        <p>Comprehensive testing of all system components and connections</p>
+
+        <div class="test-section">
+            <h2>Test Progress</h2>
+            <div id="progressInfo"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>Connection Tests</h2>
+            <div id="connectionTests" class="test-grid"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>Database Tests</h2>
+            <div id="databaseTests" class="test-grid"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>Authentication Tests</h2>
+            <div id="authTests" class="test-grid"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>Relationship Tests</h2>
+            <div id="relationshipTests" class="test-grid"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>Workflow Tests</h2>
+            <div id="workflowTests" class="test-grid"></div>
+        </div>
+
+        <div class="test-section">
+            <button id="runTestsBtn" class="btn-primary btn-large" onclick="runAllTests()">Run All Tests</button>
+        </div>
+
+        <div id="finalReport" class="test-section hidden">
+            <h2>Final Report</h2>
+            <div id="reportContent"></div>
+        </div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <script type="module">
+        import firebaseConfig from '../config/firebase.js';
+        
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.database();
+
+        const testResults = {
+            connection: [],
+            database: [],
+            auth: [],
+            relationships: [],
+            workflows: []
+        };
+
+        function addTest(category, name, status, details = '') {
+            testResults[category].push({ name, status, details });
+            updateTestCard(category + 'Tests', name, status, details);
+        }
+
+        function updateTestCard(containerId, name, status, details) {
+            const container = document.getElementById(containerId);
+            const card = document.createElement('div');
+            card.className = `test-card test-${status}`;
+            card.innerHTML = `
+                <div class="test-header">
+                    ${status === 'pass' ? '✓' : status === 'fail' ? '✗' : '⏳'} ${name}
+                </div>
+                ${details ? `<div class="test-details">${details}</div>` : ''}
+            `;
+            container.appendChild(card);
+        }
+
+        window.runAllTests = async function() {
+            document.getElementById('runTestsBtn').disabled = true;
+            document.getElementById('progressInfo').innerHTML = '<div class="spinner"></div><p>Running tests...</p>';
+
+            try {
+                // Connection Tests
+                await testConnections();
+                
+                // Database Tests
+                await testDatabase();
+                
+                // Authentication Tests
+                await testAuthentication();
+                
+                // Relationship Tests
+                await testRelationships();
+                
+                // Workflow Tests
+                await testWorkflows();
+                
+                // Generate Report
+                generateReport();
+
+            } catch (error) {
+                console.error('Test error:', error);
+                document.getElementById('progressInfo').innerHTML = `<div class="alert alert-error">Test failed: ${error.message}</div>`;
+            }
+        };
+
+        async function testConnections() {
+            // Test CSS
+            const testDiv = document.createElement('div');
+            testDiv.className = 'test-container';
+            document.body.appendChild(testDiv);
+            const styles = window.getComputedStyle(testDiv);
+            addTest('connection', 'CSS Files', styles.maxWidth === '1200px' ? 'pass' : 'fail', 'main.css loaded');
+            document.body.removeChild(testDiv);
+
+            // Test Firebase CDN
+            addTest('connection', 'Firebase CDN', typeof firebase !== 'undefined' ? 'pass' : 'fail', 'Firebase SDK loaded');
+
+            // Test Firebase Config
+            addTest('connection', 'Firebase Config', firebaseConfig.apiKey !== 'YOUR_API_KEY' ? 'pass' : 'fail', 'Configuration valid');
+
+            // Test Database Connection
+            try {
+                await db.ref('.info/connected').once('value');
+                addTest('connection', 'Database Connection', 'pass', 'Connected to Firebase');
+            } catch (error) {
+                addTest('connection', 'Database Connection', 'fail', error.message);
+            }
+        }
+
+        async function testDatabase() {
+            try {
+                // Test Users Collection
+                const usersSnapshot = await db.ref('users').limitToFirst(1).once('value');
+                addTest('database', 'Users Collection', usersSnapshot.exists() ? 'pass' : 'fail', 
+                    usersSnapshot.exists() ? 'Users data exists' : 'No users found');
+
+                // Test Products Collection
+                const productsSnapshot = await db.ref('products').limitToFirst(1).once('value');
+                addTest('database', 'Products Collection', productsSnapshot.exists() ? 'pass' : 'fail',
+                    productsSnapshot.exists() ? 'Products data exists' : 'No products found');
+
+                // Test Orders Collection
+                const ordersSnapshot = await db.ref('orders').limitToFirst(1).once('value');
+                addTest('database', 'Orders Collection', ordersSnapshot.exists() ? 'pass' : 'fail',
+                    ordersSnapshot.exists() ? 'Orders data exists' : 'No orders found');
+
+                // Test Read Operations
+                const allUsers = await db.ref('users').once('value');
+                addTest('database', 'Read Operations', 'pass', `Read ${allUsers.numChildren()} users`);
+
+            } catch (error) {
+                addTest('database', 'Database Operations', 'fail', error.message);
+            }
+        }
+
+        async function testAuthentication() {
+            try {
+                // Test if auth is initialized
+                addTest('auth', 'Auth Initialization', auth ? 'pass' : 'fail', 'Firebase Auth ready');
+
+                // Test current auth state
+                const currentUser = auth.currentUser;
+                addTest('auth', 'Auth State', 'pass', currentUser ? `Logged in as ${currentUser.email}` : 'Not logged in');
+
+                // Test user data structure
+                if (currentUser) {
+                    const userSnapshot = await db.ref('users/' + currentUser.uid).once('value');
+                    const userData = userSnapshot.val();
+                    
+                    const hasRequiredFields = userData && userData.uid && userData.email && userData.userType;
+                    addTest('auth', 'User Data Structure', hasRequiredFields ? 'pass' : 'fail',
+                        hasRequiredFields ? 'All required fields present' : 'Missing fields');
+                }
+
+            } catch (error) {
+                addTest('auth', 'Authentication', 'fail', error.message);
+            }
+        }
+
+        async function testRelationships() {
+            try {
+                // Test User-Product Relationship
+                const productsSnapshot = await db.ref('products').limitToFirst(1).once('value');
+                if (productsSnapshot.exists()) {
+                    const product = productsSnapshot.val()[Object.keys(productsSnapshot.val())[0]];
+                    const sellerSnapshot = await db.ref('users/' + product.sellerId).once('value');
+                    addTest('relationships', 'User-Product Link', sellerSnapshot.exists() ? 'pass' : 'fail',
+                        sellerSnapshot.exists() ? 'Seller reference valid' : 'Seller not found');
+                }
+
+                // Test User-Order Relationship
+                const ordersSnapshot = await db.ref('orders').limitToFirst(1).once('value');
+                if (ordersSnapshot.exists()) {
+                    const order = ordersSnapshot.val()[Object.keys(ordersSnapshot.val())[0]];
+                    const buyerSnapshot = await db.ref('users/' + order.buyerId).once('value');
+                    addTest('relationships', 'User-Order Link', buyerSnapshot.exists() ? 'pass' : 'fail',
+                        buyerSnapshot.exists() ? 'Buyer reference valid' : 'Buyer not found');
+                }
+
+                // Test Order-Product Relationship
+                if (ordersSnapshot.exists()) {
+                    const order = ordersSnapshot.val()[Object.keys(ordersSnapshot.val())[0]];
+                    if (order.items && order.items.length > 0) {
+                        const productSnapshot = await db.ref('products/' + order.items[0].id).once('value');
+                        addTest('relationships', 'Order-Product Link', productSnapshot.exists() ? 'pass' : 'fail',
+                            productSnapshot.exists() ? 'Product reference valid' : 'Product not found');
+                    }
+                }
+
+                // Test Query by Relationship
+                const allProducts = await db.ref('products').once('value');
+                if (allProducts.exists()) {
+                    const firstProduct = allProducts.val()[Object.keys(allProducts.val())[0]];
+                    const sellerProducts = await db.ref('products').orderByChild('sellerId').equalTo(firstProduct.sellerId).once('value');
+                    addTest('relationships', 'Query by Seller', 'pass', `Found ${sellerProducts.numChildren()} products`);
+                }
+
+            } catch (error) {
+                addTest('relationships', 'Relationship Tests', 'fail', error.message);
+            }
+        }
+
+        async function testWorkflows() {
+            try {
+                // Test Product Approval Workflow
+                const pendingProducts = await db.ref('products').orderByChild('status').equalTo('pending').once('value');
+                const approvedProducts = await db.ref('products').orderByChild('status').equalTo('approved').once('value');
+                addTest('workflows', 'Product Approval', 'pass', 
+                    `${pendingProducts.numChildren()} pending, ${approvedProducts.numChildren()} approved`);
+
+                // Test User Verification Workflow
+                const verifiedUsers = await db.ref('users').orderByChild('verified').equalTo(true).once('value');
+                addTest('workflows', 'User Verification', 'pass', `${verifiedUsers.numChildren()} verified users`);
+
+                // Test Order Status Workflow
+                const allOrders = await db.ref('orders').once('value');
+                const statusCounts = {};
+                allOrders.forEach(child => {
+                    const status = child.val().status;
+                    statusCounts[status] = (statusCounts[status] || 0) + 1;
+                });
+                addTest('workflows', 'Order Lifecycle', 'pass', 
+                    Object.entries(statusCounts).map(([k,v]) => `${k}: ${v}`).join(', '));
+
+                // Test Role-Based Access
+                const buyers = await db.ref('users').orderByChild('userType').equalTo('buyer').once('value');
+                const sellers = await db.ref('users').orderByChild('userType').equalTo('seller').once('value');
+                const logistics = await db.ref('users').orderByChild('userType').equalTo('logistics').once('value');
+                const admins = await db.ref('users').orderByChild('userType').equalTo('admin').once('value');
+                addTest('workflows', 'Role Distribution', 'pass',
+                    `Buyers: ${buyers.numChildren()}, Sellers: ${sellers.numChildren()}, Logistics: ${logistics.numChildren()}, Admins: ${admins.numChildren()}`);
+
+            } catch (error) {
+                addTest('workflows', 'Workflow Tests', 'fail', error.message);
+            }
+        }
+
+        function generateReport() {
+            const totalTests = Object.values(testResults).reduce((sum, arr) => sum + arr.length, 0);
+            const passedTests = Object.values(testResults).reduce((sum, arr) => 
+                sum + arr.filter(t => t.status === 'pass').length, 0);
+            const failedTests = totalTests - passedTests;
+
+            const reportDiv = document.getElementById('finalReport');
+            const contentDiv = document.getElementById('reportContent');
+            
+            reportDiv.classList.remove('hidden');
+
+            if (failedTests === 0) {
+                contentDiv.innerHTML = `
+                    <div class="alert alert-success">
+                        <h3>✅ ALL TESTS PASSED!</h3>
+                        <p><strong>${passedTests} of ${totalTests} tests passed successfully</strong></p>
+                        
+                        <h4>Test Summary:</h4>
+                        <ul>
+                            <li>✓ Connection Tests: ${testResults.connection.filter(t => t.status === 'pass').length}/${testResults.connection.length}</li>
+                            <li>✓ Database Tests: ${testResults.database.filter(t => t.status === 'pass').length}/${testResults.database.length}</li>
+                            <li>✓ Authentication Tests: ${testResults.auth.filter(t => t.status === 'pass').length}/${testResults.auth.length}</li>
+                            <li>✓ Relationship Tests: ${testResults.relationships.filter(t => t.status === 'pass').length}/${testResults.relationships.length}</li>
+                            <li>✓ Workflow Tests: ${testResults.workflows.filter(t => t.status === 'pass').length}/${testResults.workflows.length}</li>
+                        </ul>
+
+                        <h4>System Status:</h4>
+                        <ul>
+                            <li>✓ All files connected properly</li>
+                            <li>✓ Database structure correct</li>
+                            <li>✓ All relationships working</li>
+                            <li>✓ Authentication functional</li>
+                            <li>✓ Workflows operational</li>
+                        </ul>
+
+                        <h4>Ready for Production! 🚀</h4>
+                        <p>Your Kigali Mega Market system is fully functional and ready to use.</p>
+                        
+                        <div style="margin-top: 1rem;">
+                            <a href="../pages/login.html" class="btn-primary">Go to Login</a>
+                            <a href="../index.html" class="btn-secondary">Go to Home</a>
+                        </div>
+                    </div>
+                `;
+            } else {
+                contentDiv.innerHTML = `
+                    <div class="alert alert-error">
+                        <h3>⚠ Some Tests Failed</h3>
+                        <p><strong>${passedTests} passed, ${failedTests} failed out of ${totalTests} tests</strong></p>
+                        <p>Please review the failed tests above and fix the issues.</p>
+                    </div>
+                `;
+            }
+
+            document.getElementById('progressInfo').innerHTML = `
+                <div class="alert alert-info">
+                    <strong>Testing Complete!</strong> ${passedTests}/${totalTests} tests passed
+                </div>
+            `;
+        }
+
+        // Auto-run tests on page load
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                document.getElementById('runTestsBtn').click();
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logistics Dashboard - Kigali Mega Market</title>
+    <link rel="stylesheet" href="../css/main.css">
+    <style>
+        .dashboard { padding: 2rem 0; background: var(--light-gray); min-height: 100vh; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+        .stat-card { background: linear-gradient(135deg, var(--primary-color), var(--primary-dark)); color: white; padding: 1.5rem; border-radius: var(--border-radius); }
+        .stat-value { font-size: 2rem; font-weight: 700; }
+        .delivery-card { margin-bottom: 1rem; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <h1>🛒 Kigali Mega Market - Logistics</h1>
+            </div>
+            <div class="nav-links">
+                <span id="userName"></span>
+                <button onclick="logout()" class="btn-secondary btn-small">Logout</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="dashboard">
+        <div class="container">
+            <h2>Logistics Dashboard</h2>
+            
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div>Available Deliveries</div>
+                    <div class="stat-value" id="availableDeliveries">0</div>
+                </div>
+                <div class="stat-card">
+                    <div>My Active Deliveries</div>
+                    <div class="stat-value" id="activeDeliveries">0</div>
+                </div>
+                <div class="stat-card">
+                    <div>Completed Today</div>
+                    <div class="stat-value" id="completedToday">0</div>
+                </div>
+            </div>
+
+            <h3>Available for Pickup</h3>
+            <div id="availableContainer">
+                <div class="spinner"></div>
+            </div>
+
+            <h3 class="mt-2">My Active Deliveries</h3>
+            <div id="activeContainer">
+                <div class="spinner"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <script type="module">
+        import firebaseConfig from '../config/firebase.js';
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.database();
+
+        let currentUser = null;
+
+        window.logout = () => {
+            auth.signOut().then(() => window.location.href = '../index.html');
+        };
+
+        auth.onAuthStateChanged(async (user) => {
+            if (!user) {
+                window.location.href = 'login.html';
+                return;
+            }
+
+            const snapshot = await db.ref('users/' + user.uid).once('value');
+            currentUser = snapshot.val();
+            
+            if (currentUser.userType !== 'logistics') {
+                window.location.href = 'login.html';
+                return;
+            }
+
+            document.getElementById('userName').textContent = currentUser.fullName;
+            loadDeliveries();
+            loadStats();
+        });
+
+        async function loadDeliveries() {
+            const snapshot = await db.ref('orders').once('value');
+            const available = [];
+            const active = [];
+            
+            snapshot.forEach((child) => {
+                const order = { id: child.key, ...child.val() };
+                
+                if (order.status === 'ready' && !order.logisticsId) {
+                    available.push(order);
+                } else if (order.logisticsId === auth.currentUser.uid && order.status === 'in_transit') {
+                    active.push(order);
+                }
+            });
+
+            displayAvailable(available);
+            displayActive(active);
+        }
+
+        function displayAvailable(orders) {
+            const container = document.getElementById('availableContainer');
+            
+            if (orders.length === 0) {
+                container.innerHTML = '<p>No deliveries available for pickup</p>';
+                return;
+            }
+
+            container.innerHTML = orders.map(order => {
+                const date = new Date(order.createdAt).toLocaleString();
+                
+                return `
+                    <div class="card delivery-card">
+                        <div class="flex-between mb-1">
+                            <div>
+                                <strong>Order #${order.id.substring(0, 8)}</strong><br>
+                                <small>${date}</small>
+                            </div>
+                            <span class="badge badge-warning">Ready for Pickup</span>
+                        </div>
+                        <p><strong>Buyer:</strong> ${order.buyerName}</p>
+                        <p><strong>Items:</strong> ${order.items.length}</p>
+                        <p><strong>Total:</strong> ${order.total} RWF</p>
+                        <button onclick="acceptDelivery('${order.id}')" class="btn-primary btn-small">Accept Delivery</button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function displayActive(orders) {
+            const container = document.getElementById('activeContainer');
+            
+            if (orders.length === 0) {
+                container.innerHTML = '<p>No active deliveries</p>';
+                return;
+            }
+
+            container.innerHTML = orders.map(order => {
+                const date = new Date(order.createdAt).toLocaleString();
+                
+                return `
+                    <div class="card delivery-card">
+                        <div class="flex-between mb-1">
+                            <div>
+                                <strong>Order #${order.id.substring(0, 8)}</strong><br>
+                                <small>${date}</small>
+                            </div>
+                            <span class="badge badge-info">In Transit</span>
+                        </div>
+                        <p><strong>Buyer:</strong> ${order.buyerName}</p>
+                        <p><strong>Items:</strong> ${order.items.length}</p>
+                        <p><strong>Total:</strong> ${order.total} RWF</p>
+                        <button onclick="completeDelivery('${order.id}')" class="btn-success btn-small">Mark as Delivered</button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        window.acceptDelivery = async (orderId) => {
+            try {
+                await db.ref('orders/' + orderId).update({
+                    status: 'in_transit',
+                    logisticsId: auth.currentUser.uid,
+                    logisticsName: currentUser.fullName,
+                    pickupTime: Date.now()
+                });
+                alert('Delivery accepted!');
+                loadDeliveries();
+                loadStats();
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        };
+
+        window.completeDelivery = async (orderId) => {
+            if (!confirm('Confirm delivery completion?')) return;
+            
+            try {
+                await db.ref('orders/' + orderId).update({
+                    status: 'delivered',
+                    deliveryTime: Date.now()
+                });
+                alert('Delivery completed!');
+                loadDeliveries();
+                loadStats();
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        };
+
+        async function loadStats() {
+            const snapshot = await db.ref('orders').once('value');
+            let available = 0;
+            let active = 0;
+            let completedToday = 0;
+            
+            const today = new Date().setHours(0, 0, 0, 0);
+            
+            snapshot.forEach((child) => {
+                const order = child.val();
+                
+                if (order.status === 'ready' && !order.logisticsId) {
+                    available++;
+                } else if (order.logisticsId === auth.currentUser.uid && order.status === 'in_transit') {
+                    active++;
+                } else if (order.logisticsId === auth.currentUser.uid && order.status === 'delivered' && order.deliveryTime >= today) {
+                    completedToday++;
+                }
+            });
+            
+            document.getElementById('availableDeliveries').textContent = available;
+            document.getElementById('activeDeliveries').textContent = active;
+            document.getElementById('completedToday').textContent = completedToday;
+        }
+    </script>
+</body>
+</html>

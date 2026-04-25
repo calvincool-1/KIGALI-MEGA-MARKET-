@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Database Setup - Kigali Mega Market</title>
+    <link rel="stylesheet" href="../css/main.css">
+</head>
+<body>
+    <div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--light-gray);">
+        <div class="card" style="max-width: 600px;">
+            <h2>Database Setup</h2>
+            <p>This page will initialize the database with an admin account and sample data.</p>
+            
+            <div id="status"></div>
+            
+            <button onclick="initializeDatabase()" class="btn-primary" style="width: 100%;">Initialize Database</button>
+        </div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <script type="module">
+        import firebaseConfig from '../config/firebase.js';
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.database();
+
+        window.initializeDatabase = async () => {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = '<div class="spinner"></div><p>Setting up database...</p>';
+            
+            try {
+                // Create admin user
+                const adminEmail = 'admin@kigalimegamarket.com';
+                const adminPassword = 'admin123456';
+                
+                let adminUser;
+                try {
+                    const userCredential = await auth.createUserWithEmailAndPassword(adminEmail, adminPassword);
+                    adminUser = userCredential.user;
+                } catch (error) {
+                    if (error.code === 'auth/email-already-in-use') {
+                        statusDiv.innerHTML += '<div class="alert alert-info">Admin user already exists</div>';
+                        // Sign in to get the user
+                        const userCredential = await auth.signInWithEmailAndPassword(adminEmail, adminPassword);
+                        adminUser = userCredential.user;
+                    } else {
+                        throw error;
+                    }
+                }
+
+                // Set admin user data
+                await db.ref('users/' + adminUser.uid).set({
+                    uid: adminUser.uid,
+                    email: adminEmail,
+                    fullName: 'System Administrator',
+                    phone: '+250788000000',
+                    userType: 'admin',
+                    verified: true,
+                    createdAt: Date.now()
+                });
+
+                statusDiv.innerHTML += '<div class="alert alert-success">✓ Admin account created</div>';
+                statusDiv.innerHTML += '<div class="alert alert-info"><strong>Admin Login:</strong><br>Email: admin@kigalimegamarket.com<br>Password: admin123456</div>';
+                
+                // Add sample categories
+                const categories = ['electronics', 'fashion', 'food', 'home', 'beauty', 'other'];
+                statusDiv.innerHTML += '<div class="alert alert-success">✓ Categories configured</div>';
+                
+                statusDiv.innerHTML += '<div class="alert alert-success"><strong>Setup Complete!</strong><br>You can now <a href="login.html">login</a> with the admin credentials.</div>';
+                
+                await auth.signOut();
+                
+            } catch (error) {
+                statusDiv.innerHTML += '<div class="alert alert-error">Error: ' + error.message + '</div>';
+            }
+        };
+    </script>
+</body>
+</html>

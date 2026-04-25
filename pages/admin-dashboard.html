@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Kigali Mega Market</title>
+    <link rel="stylesheet" href="../css/main.css">
+    <style>
+        .dashboard { padding: 2rem 0; background: var(--light-gray); min-height: 100vh; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+        .stat-card { background: linear-gradient(135deg, var(--primary-color), var(--primary-dark)); color: white; padding: 1.5rem; border-radius: var(--border-radius); }
+        .stat-value { font-size: 2rem; font-weight: 700; }
+        .tabs { display: flex; gap: 1rem; margin-bottom: 2rem; border-bottom: 2px solid var(--light-gray); flex-wrap: wrap; }
+        .tab { padding: 1rem 2rem; cursor: pointer; border: none; background: none; font-size: 1rem; font-weight: 600; color: var(--gray); }
+        .tab.active { color: var(--primary-color); border-bottom: 3px solid var(--primary-color); }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <h1>🛒 Kigali Mega Market - Admin</h1>
+            </div>
+            <div class="nav-links">
+                <span id="userName"></span>
+                <button onclick="logout()" class="btn-secondary btn-small">Logout</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="dashboard">
+        <div class="container">
+            <h2>Admin Dashboard</h2>
+            
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div>Total Users</div>
+                    <div class="stat-value" id="totalUsers">0</div>
+                </div>
+                <div class="stat-card">
+                    <div>Pending Verifications</div>
+                    <div class="stat-value" id="pendingUsers">0</div>
+                </div>
+                <div class="stat-card">
+                    <div>Pending Products</div>
+                    <div class="stat-value" id="pendingProducts">0</div>
+                </div>
+                <div class="stat-card">
+                    <div>Buyer Requests</div>
+                    <div class="stat-value" id="totalOrders">0</div>
+                </div>
+            </div>
+
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('products')">Product Approval</button>
+                <button class="tab" onclick="switchTab('requests')">Buyer Requests</button>
+                <button class="tab" onclick="switchTab('users')">User Verification</button>
+            </div>
+
+            <div id="productsTab" class="tab-content active">
+                <h3>Pending Product Approvals</h3>
+                <div id="productsContainer">
+                    <div class="spinner"></div>
+                </div>
+            </div>
+
+            <div id="requestsTab" class="tab-content">
+                <h3>Buyer Requests Monitoring</h3>
+                <p style="color: var(--gray); margin-bottom: 1rem;">Monitor buyer requests. Remove spam or inappropriate content if necessary.</p>
+                <div id="requestsContainer" class="grid-3">
+                    <div class="spinner"></div>
+                </div>
+            </div>
+
+            <div id="usersTab" class="tab-content">
+                <h3>Pending User Verifications</h3>
+                <div id="usersContainer">
+                    <div class="spinner"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <script type="module">
+        import firebaseConfig from '../config/firebase.js';
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.database();
+
+        window.logout = () => {
+            auth.signOut().then(() => window.location.href = '../index.html');
+        };
+
+        window.switchTab = (tab) => {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            
+            event.target.classList.add('active');
+            document.getElementById(tab + 'Tab').classList.add('active');
+            
+            if (tab === 'products') loadProducts();
+            if (tab === 'requests') loadRequests();
+        };
+
+        auth.onAuthStateChanged(async (user) => {
+            if (!user) {
+                window.location.href = 'login.html';
+                return;
+            }
+
+            const snapshot = await db.ref('users/' + user.uid).once('value');
+            const userData = snapshot.val();
+            
+            if (userData.userType !== 'admin') {
+                window.location.href = 'login.html';
+                return;
+            }
+
+            document.getElementById('userName').textContent = userData.fullName;
+            loadProducts();
+            loadStats();
+        });
+
+        async function loadRequests() {
+            const snapshot = await db.ref('requests').once('value');
+            const requests = [];
+            
+            snapshot.forEach((child) => {
+                requests.push({ id: child.key, ...child.val() });
+            });
+
+            requests.sort((a, b) => b.createdAt - a.createdAt);
+            displayRequests(requests);
+        }
+
+        function displayRequests(requests) {
+            const container = document.getElementById('requestsContainer');
+            
+            if (requests.length === 0) {
+                container.innerHTML = '<p>No buyer requests</p>';
+                return;
+            }
+
+            container.innerHTML = requests.map(request => `
+                <div class="card" style="background: #fef3c7; border-left: 4px solid var(--warning-color);">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                        <span class="badge badge-warning">${request.category}</span>
+                        <small>${new Date(request.createdAt).toLocaleDateString()}</small>
+                    </div>
+                    <p style="font-size: 0.95rem; margin-bottom: 0.5rem;">${request.description}</p>
+                    <div style="color: var(--secondary-color); font-weight: 600; margin-bottom: 0.5rem;">
+                        Budget: ${request.minBudget} - ${request.maxBudget} RWF
+                    </div>
+                    <p style="font-size: 0.85rem; color: var(--gray);">Quantity: ${request.quantity}</p>
+                    <div style="font-size: 0.85rem; color: var(--gray); margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid var(--light-gray);">
+                        <strong>Buyer:</strong> ${request.buyerName}<br>
+                        <strong>Contact:</strong> ${request.buyerContact}
+                    </div>
+                    <button onclick="removeRequest('${request.id}')" class="btn-danger btn-small mt-1">Remove (Spam)</button>
+                </div>
+            `).join('');
+        }
+
+        window.removeRequest = async (requestId) => {
+            if (!confirm('Remove this request? This action cannot be undone.')) return;
+            
+            try {
+                await db.ref('requests/' + requestId).remove();
+                alert('Request removed');
+                loadRequests();
+                loadStats();
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        };
+
+        async function loadUsers() {
+            const snapshot = await db.ref('users').once('value');
+            const users = [];
+            
+            snapshot.forEach((child) => {
+                const user = { id: child.key, ...child.val() };
+                if (!user.verified && user.userType !== 'admin') {
+                    users.push(user);
+                }
+            });
+
+            displayUsers(users);
+        }
+
+        function displayUsers(users) {
+            const container = document.getElementById('usersContainer');
+            
+            if (users.length === 0) {
+                container.innerHTML = '<p>No pending verifications</p>';
+                return;
+            }
+
+            container.innerHTML = `
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Type</th>
+                            <th>Phone</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${users.map(user => `
+                            <tr>
+                                <td>${user.fullName}</td>
+                                <td>${user.email}</td>
+                                <td><span class="badge badge-info">${user.userType}</span></td>
+                                <td>${user.phone}</td>
+                                <td>
+                                    <button onclick="verifyUser('${user.id}')" class="btn-success btn-small">Approve</button>
+                                    <button onclick="rejectUser('${user.id}')" class="btn-danger btn-small">Reject</button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        window.verifyUser = async (userId) => {
+            try {
+                await db.ref('users/' + userId).update({ verified: true });
+                alert('User verified successfully!');
+                loadUsers();
+                loadStats();
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        };
+
+        window.rejectUser = async (userId) => {
+            if (!confirm('Are you sure you want to reject this user?')) return;
+            
+            try {
+                await db.ref('users/' + userId).remove();
+                alert('User rejected!');
+                loadUsers();
+                loadStats();
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        };
+
+        async function loadProducts() {
+            const snapshot = await db.ref('products').orderByChild('status').equalTo('pending').once('value');
+            const products = [];
+            
+            snapshot.forEach((child) => {
+                products.push({ id: child.key, ...child.val() });
+            });
+
+            displayProducts(products);
+        }
+
+        function displayProducts(products) {
+            const container = document.getElementById('productsContainer');
+            
+            if (products.length === 0) {
+                container.innerHTML = '<p>No pending product approvals</p>';
+                return;
+            }
+
+            container.innerHTML = `
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Product Name</th>
+                            <th>Seller</th>
+                            <th>Price</th>
+                            <th>Description</th>
+                            <th>Category</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${products.map(product => `
+                            <tr>
+                                <td>${product.name}</td>
+                                <td>${product.sellerName}</td>
+                                <td>${product.price} RWF</td>
+                                <td>${product.description.substring(0, 50)}...</td>
+                                <td>${product.category}</td>
+                                <td>
+                                    <button onclick="approveProduct('${product.id}')" class="btn-success btn-small">Approve</button>
+                                    <button onclick="rejectProduct('${product.id}')" class="btn-danger btn-small">Reject</button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        window.approveProduct = async (productId) => {
+            try {
+                await db.ref('products/' + productId).update({ 
+                    status: 'approved',
+                    approvedAt: Date.now()
+                });
+                alert('Product approved and published to marketplace!');
+                loadProducts();
+                loadStats();
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        };
+
+        window.rejectProduct = async (productId) => {
+            const feedback = prompt('Rejection reason (will be sent to seller):');
+            if (!feedback) return;
+            
+            try {
+                await db.ref('products/' + productId).update({ 
+                    status: 'rejected',
+                    rejectionReason: feedback,
+                    rejectedAt: Date.now()
+                });
+                alert('Product rejected with feedback');
+                loadProducts();
+                loadStats();
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        };
+
+        async function loadOrders() {
+            const snapshot = await db.ref('orders').once('value');
+            const orders = [];
+            
+            snapshot.forEach((child) => {
+                orders.push({ id: child.key, ...child.val() });
+            });
+
+            orders.sort((a, b) => b.createdAt - a.createdAt);
+            displayOrders(orders);
+        }
+
+        function displayOrders(orders) {
+            const container = document.getElementById('ordersContainer');
+            
+            if (orders.length === 0) {
+                container.innerHTML = '<p>No orders yet</p>';
+                return;
+            }
+
+            container.innerHTML = `
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Order ID</th>
+                            <th>Buyer</th>
+                            <th>Total</th>
+                            <th>Status</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${orders.map(order => {
+                            const date = new Date(order.createdAt).toLocaleDateString();
+                            return `
+                                <tr>
+                                    <td>#${order.id.substring(0, 8)}</td>
+                                    <td>${order.buyerName}</td>
+                                    <td>${order.total} RWF</td>
+                                    <td><span class="badge badge-info">${order.status}</span></td>
+                                    <td>${date}</td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        async function loadStats() {
+            const usersSnapshot = await db.ref('users').once('value');
+            const productsSnapshot = await db.ref('products').once('value');
+            const requestsSnapshot = await db.ref('requests').once('value');
+            
+            let totalUsers = 0;
+            let pendingUsers = 0;
+            let pendingProducts = 0;
+            let totalRequests = 0;
+            
+            usersSnapshot.forEach((child) => {
+                const user = child.val();
+                if (user.userType !== 'admin') {
+                    totalUsers++;
+                    if (!user.verified) pendingUsers++;
+                }
+            });
+            
+            productsSnapshot.forEach((child) => {
+                if (child.val().status === 'pending') pendingProducts++;
+            });
+            
+            requestsSnapshot.forEach(() => totalRequests++);
+            
+            document.getElementById('totalUsers').textContent = totalUsers;
+            document.getElementById('pendingUsers').textContent = pendingUsers;
+            document.getElementById('pendingProducts').textContent = pendingProducts;
+            document.getElementById('totalOrders').textContent = totalRequests;
+        }
+    </script>
+</body>
+</html>

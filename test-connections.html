@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connection Test - Kigali Mega Market</title>
+    <link rel="stylesheet" href="css/main.css">
+    <style>
+        .test-container { padding: 2rem; max-width: 800px; margin: 0 auto; }
+        .test-item { padding: 1rem; margin: 1rem 0; border-radius: var(--border-radius); }
+        .test-pass { background: #d1fae5; border-left: 4px solid var(--secondary-color); }
+        .test-fail { background: #fee2e2; border-left: 4px solid var(--danger-color); }
+        .test-pending { background: #fef3c7; border-left: 4px solid var(--warning-color); }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🔍 Connection Test</h1>
+        <p>Testing all CSS, JS, and Firebase connections...</p>
+        
+        <div id="cssTest" class="test-item test-pending">
+            <strong>CSS Files:</strong> Testing...
+        </div>
+        
+        <div id="firebaseTest" class="test-item test-pending">
+            <strong>Firebase CDN:</strong> Testing...
+        </div>
+        
+        <div id="configTest" class="test-item test-pending">
+            <strong>Firebase Config:</strong> Testing...
+        </div>
+        
+        <div id="pagesTest" class="test-item test-pending">
+            <strong>Page Links:</strong> Testing...
+        </div>
+        
+        <div id="summary" class="mt-2"></div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <script type="module">
+        const results = {
+            css: false,
+            firebase: false,
+            config: false,
+            pages: false
+        };
+
+        // Test CSS
+        const testElement = document.querySelector('.test-container');
+        const styles = window.getComputedStyle(testElement);
+        if (styles.padding === '32px') {
+            results.css = true;
+            document.getElementById('cssTest').className = 'test-item test-pass';
+            document.getElementById('cssTest').innerHTML = '<strong>CSS Files:</strong> ✓ Connected and working';
+        } else {
+            document.getElementById('cssTest').className = 'test-item test-fail';
+            document.getElementById('cssTest').innerHTML = '<strong>CSS Files:</strong> ✗ Not loading properly';
+        }
+
+        // Test Firebase CDN
+        if (typeof firebase !== 'undefined') {
+            results.firebase = true;
+            document.getElementById('firebaseTest').className = 'test-item test-pass';
+            document.getElementById('firebaseTest').innerHTML = '<strong>Firebase CDN:</strong> ✓ Loaded successfully';
+        } else {
+            document.getElementById('firebaseTest').className = 'test-item test-fail';
+            document.getElementById('firebaseTest').innerHTML = '<strong>Firebase CDN:</strong> ✗ Failed to load';
+        }
+
+        // Test Firebase Config
+        try {
+            const firebaseConfig = await import('./config/firebase.js');
+            if (firebaseConfig.default && firebaseConfig.default.apiKey) {
+                if (firebaseConfig.default.apiKey === 'YOUR_API_KEY') {
+                    document.getElementById('configTest').className = 'test-item test-pending';
+                    document.getElementById('configTest').innerHTML = '<strong>Firebase Config:</strong> ⚠ Needs configuration (update config/firebase.js)';
+                } else {
+                    results.config = true;
+                    document.getElementById('configTest').className = 'test-item test-pass';
+                    document.getElementById('configTest').innerHTML = '<strong>Firebase Config:</strong> ✓ Configured';
+                }
+            } else {
+                document.getElementById('configTest').className = 'test-item test-fail';
+                document.getElementById('configTest').innerHTML = '<strong>Firebase Config:</strong> ✗ Invalid configuration';
+            }
+        } catch (error) {
+            document.getElementById('configTest').className = 'test-item test-fail';
+            document.getElementById('configTest').innerHTML = '<strong>Firebase Config:</strong> ✗ ' + error.message;
+        }
+
+        // Test page links
+        const pages = [
+            'pages/register.html',
+            'pages/login.html',
+            'pages/buyer-dashboard.html',
+            'pages/seller-dashboard.html',
+            'pages/admin-dashboard.html',
+            'pages/logistics-dashboard.html',
+            'pages/setup.html'
+        ];
+
+        let pagesExist = 0;
+        for (const page of pages) {
+            try {
+                const response = await fetch(page, { method: 'HEAD' });
+                if (response.ok) pagesExist++;
+            } catch (e) {
+                console.log('Page check failed:', page);
+            }
+        }
+
+        if (pagesExist === pages.length) {
+            results.pages = true;
+            document.getElementById('pagesTest').className = 'test-item test-pass';
+            document.getElementById('pagesTest').innerHTML = '<strong>Page Links:</strong> ✓ All pages accessible';
+        } else {
+            document.getElementById('pagesTest').className = 'test-item test-fail';
+            document.getElementById('pagesTest').innerHTML = `<strong>Page Links:</strong> ✗ ${pagesExist}/${pages.length} pages accessible`;
+        }
+
+        // Summary
+        const passed = Object.values(results).filter(r => r).length;
+        const total = Object.keys(results).length;
+        
+        const summaryDiv = document.getElementById('summary');
+        if (passed === total) {
+            summaryDiv.innerHTML = '<div class="alert alert-success"><strong>✓ All tests passed!</strong> Your application is ready.</div>';
+        } else {
+            summaryDiv.innerHTML = `<div class="alert alert-error"><strong>⚠ ${passed}/${total} tests passed.</strong> Please fix the issues above.</div>`;
+        }
+    </script>
+</body>
+</html>

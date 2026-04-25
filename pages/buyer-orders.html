@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Orders - Kigali Mega Market</title>
+    <link rel="stylesheet" href="../css/main.css">
+    <style>
+        .dashboard { padding: 2rem 0; background: var(--light-gray); min-height: 100vh; }
+        .order-card { margin-bottom: 1.5rem; }
+        .order-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 2px solid var(--light-gray); }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <h1>🛒 Kigali Mega Market</h1>
+            </div>
+            <div class="nav-links">
+                <a href="buyer-dashboard.html">Products</a>
+                <a href="buyer-orders.html">My Orders</a>
+                <span id="userName"></span>
+                <button onclick="logout()" class="btn-secondary btn-small">Logout</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="dashboard">
+        <div class="container">
+            <h2>My Orders</h2>
+            <div id="ordersContainer">
+                <div class="spinner"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <script type="module">
+        import firebaseConfig from '../config/firebase.js';
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.database();
+
+        window.logout = () => {
+            auth.signOut().then(() => window.location.href = '../index.html');
+        };
+
+        auth.onAuthStateChanged(async (user) => {
+            if (!user) {
+                window.location.href = 'login.html';
+                return;
+            }
+
+            const snapshot = await db.ref('users/' + user.uid).once('value');
+            const userData = snapshot.val();
+            document.getElementById('userName').textContent = userData.fullName;
+            
+            loadOrders(user.uid);
+        });
+
+        async function loadOrders(userId) {
+            const snapshot = await db.ref('orders').orderByChild('buyerId').equalTo(userId).once('value');
+            const orders = [];
+            
+            snapshot.forEach((child) => {
+                orders.push({ id: child.key, ...child.val() });
+            });
+
+            orders.sort((a, b) => b.createdAt - a.createdAt);
+            displayOrders(orders);
+        }
+
+        function displayOrders(orders) {
+            const container = document.getElementById('ordersContainer');
+            
+            if (orders.length === 0) {
+                container.innerHTML = '<p>No orders yet</p>';
+                return;
+            }
+
+            container.innerHTML = orders.map(order => {
+                const statusBadge = getStatusBadge(order.status);
+                const date = new Date(order.createdAt).toLocaleString();
+                
+                return `
+                    <div class="card order-card">
+                        <div class="order-header">
+                            <div>
+                                <strong>Order #${order.id.substring(0, 8)}</strong><br>
+                                <small>${date}</small>
+                            </div>
+                            <span class="badge ${statusBadge.class}">${statusBadge.text}</span>
+                        </div>
+                        <div>
+                            ${order.items.map(item => `
+                                <div style="padding: 0.5rem 0;">
+                                    ${item.name} - ${item.quantity} x ${item.price} RWF
+                                </div>
+                            `).join('')}
+                        </div>
+                        <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--light-gray);">
+                            <strong>Total: ${order.total} RWF</strong>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function getStatusBadge(status) {
+            const badges = {
+                pending: { class: 'badge-warning', text: 'Pending' },
+                confirmed: { class: 'badge-info', text: 'Confirmed' },
+                preparing: { class: 'badge-info', text: 'Preparing' },
+                ready: { class: 'badge-info', text: 'Ready for Pickup' },
+                in_transit: { class: 'badge-info', text: 'In Transit' },
+                delivered: { class: 'badge-success', text: 'Delivered' },
+                cancelled: { class: 'badge-danger', text: 'Cancelled' }
+            };
+            return badges[status] || badges.pending;
+        }
+    </script>
+</body>
+</html>
