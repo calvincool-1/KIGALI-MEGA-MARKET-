@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Authentication Test - Kigali Mega Market</title>
+    <link rel="stylesheet" href="../css/main.css">
+    <style>
+        .test-container {
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 2rem;
+        }
+        .test-section {
+            background: white;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+        }
+        .test-result {
+            padding: 1rem;
+            margin-top: 1rem;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.9rem;
+        }
+        .test-result.success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .test-result.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .test-result.info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🧪 Authentication System Test</h1>
+        <p>This page tests the complete authentication flow including registration, login, session persistence, and role-based redirection.</p>
+
+        <!-- Current Auth State -->
+        <div class="test-section">
+            <h3>Current Authentication State</h3>
+            <button onclick="checkAuthState()" class="btn-primary">Check Auth State</button>
+            <div id="authStateResult"></div>
+        </div>
+
+        <!-- Test Login -->
+        <div class="test-section">
+            <h3>Test Login (Admin Account)</h3>
+            <p>Test with: admin@kigalimegamarket.com / admin123456</p>
+            <form id="testLoginForm">
+                <div class="form-group">
+                    <input type="email" id="testEmail" class="form-control" value="admin@kigalimegamarket.com" placeholder="Email">
+                </div>
+                <div class="form-group">
+                    <input type="password" id="testPassword" class="form-control" value="admin123456" placeholder="Password">
+                </div>
+                <button type="submit" class="btn-primary">Test Login</button>
+            </form>
+            <div id="loginTestResult"></div>
+        </div>
+
+        <!-- Test Database Connection -->
+        <div class="test-section">
+            <h3>Test Database Connection</h3>
+            <button onclick="testDatabase()" class="btn-primary">Test Database</button>
+            <div id="dbTestResult"></div>
+        </div>
+
+        <!-- Test Logout -->
+        <div class="test-section">
+            <h3>Test Logout</h3>
+            <button onclick="testLogout()" class="btn-secondary">Test Logout</button>
+            <div id="logoutTestResult"></div>
+        </div>
+
+        <!-- Navigation Links -->
+        <div class="test-section">
+            <h3>Quick Navigation</h3>
+            <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                <a href="../index.html" class="btn-secondary">Home</a>
+                <a href="login.html" class="btn-secondary">Login Page</a>
+                <a href="register.html" class="btn-secondary">Register Page</a>
+                <a href="buyer-dashboard.html" class="btn-secondary">Buyer Dashboard</a>
+                <a href="seller-dashboard.html" class="btn-secondary">Seller Dashboard</a>
+                <a href="admin-dashboard.html" class="btn-secondary">Admin Dashboard</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    
+    <!-- Core App Module -->
+    <script type="module">
+        import '../js/app.js';
+        
+        // Check current auth state
+        window.checkAuthState = async function() {
+            const resultDiv = document.getElementById('authStateResult');
+            resultDiv.innerHTML = '<div class="spinner"></div>';
+            
+            try {
+                const currentUser = await window.getCurrentUser();
+                
+                if (currentUser) {
+                    resultDiv.innerHTML = `
+                        <div class="test-result success">
+                            <strong>✅ User is logged in</strong><br>
+                            UID: ${currentUser.user.uid}<br>
+                            Email: ${currentUser.userData.email}<br>
+                            Name: ${currentUser.userData.fullName}<br>
+                            Role: ${currentUser.userData.userType}<br>
+                            Verified: ${currentUser.userData.verified ? 'Yes' : 'No'}<br>
+                            Last Login: ${new Date(currentUser.userData.lastLogin).toLocaleString()}
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="test-result info">
+                            <strong>ℹ️ No user logged in</strong><br>
+                            Session state: Not authenticated
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="test-result error">
+                        <strong>❌ Error checking auth state</strong><br>
+                        ${error.message}
+                    </div>
+                `;
+            }
+        };
+        
+        // Test login
+        document.getElementById('testLoginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const resultDiv = document.getElementById('loginTestResult');
+            resultDiv.innerHTML = '<div class="spinner"></div>';
+            
+            const email = document.getElementById('testEmail').value;
+            const password = document.getElementById('testPassword').value;
+            
+            try {
+                const { user, userData } = await window.loginUser(email, password);
+                
+                resultDiv.innerHTML = `
+                    <div class="test-result success">
+                        <strong>✅ Login successful!</strong><br>
+                        UID: ${user.uid}<br>
+                        Email: ${userData.email}<br>
+                        Name: ${userData.fullName}<br>
+                        Role: ${userData.userType}<br>
+                        Verified: ${userData.verified ? 'Yes' : 'No'}<br>
+                        <br>
+                        <strong>Note:</strong> You will be redirected to ${userData.userType} dashboard in 3 seconds...
+                    </div>
+                `;
+                
+                // Redirect after 3 seconds
+                setTimeout(() => {
+                    window.redirectByRole(userData.userType);
+                }, 3000);
+                
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="test-result error">
+                        <strong>❌ Login failed</strong><br>
+                        ${error.message}
+                    </div>
+                `;
+            }
+        });
+        
+        // Test database connection
+        window.testDatabase = async function() {
+            const resultDiv = document.getElementById('dbTestResult');
+            resultDiv.innerHTML = '<div class="spinner"></div>';
+            
+            try {
+                // Try to read from database
+                const snapshot = await window.db.ref('users').limitToFirst(1).once('value');
+                const hasData = snapshot.exists();
+                
+                resultDiv.innerHTML = `
+                    <div class="test-result success">
+                        <strong>✅ Database connection successful!</strong><br>
+                        Database URL: ${window.db.ref().toString()}<br>
+                        Has data: ${hasData ? 'Yes' : 'No'}<br>
+                        Connection status: Active
+                    </div>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="test-result error">
+                        <strong>❌ Database connection failed</strong><br>
+                        ${error.message}
+                    </div>
+                `;
+            }
+        };
+        
+        // Test logout
+        window.testLogout = async function() {
+            const resultDiv = document.getElementById('logoutTestResult');
+            resultDiv.innerHTML = '<div class="spinner"></div>';
+            
+            try {
+                await window.auth.signOut();
+                
+                resultDiv.innerHTML = `
+                    <div class="test-result success">
+                        <strong>✅ Logout successful!</strong><br>
+                        User has been signed out.<br>
+                        Session cleared.
+                    </div>
+                `;
+                
+                // Refresh auth state display
+                setTimeout(() => {
+                    checkAuthState();
+                }, 1000);
+                
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="test-result error">
+                        <strong>❌ Logout failed</strong><br>
+                        ${error.message}
+                    </div>
+                `;
+            }
+        };
+        
+        // Auto-check auth state on load
+        window.addEventListener('load', () => {
+            checkAuthState();
+        });
+    </script>
+</body>
+</html>

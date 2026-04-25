@@ -18,6 +18,15 @@ try {
     db = firebase.database();
     storage = firebase.storage();
     
+    // Enable auth state persistence
+    auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)
+        .then(() => {
+            console.log('✅ Auth persistence enabled');
+        })
+        .catch((error) => {
+            console.error('⚠️ Auth persistence error:', error);
+        });
+    
     // Make globally accessible
     window.auth = auth;
     window.db = db;
@@ -43,7 +52,11 @@ window.registerUser = async function(userData) {
         
         // Validate required fields
         if (!email || !password || !fullName || !role) {
-            throw new Error('Missing required fields');
+            throw new Error('All fields are required');
+        }
+        
+        if (password.length < 6) {
+            throw new Error('Password must be at least 6 characters');
         }
         
         // Create authentication account
@@ -57,7 +70,7 @@ window.registerUser = async function(userData) {
             fullName: fullName,
             phone: phone || '',
             userType: role,
-            verified: false,
+            verified: false, // All users need admin verification except admin
             createdAt: Date.now(),
             lastLogin: Date.now(),
             ...additionalData
@@ -66,7 +79,10 @@ window.registerUser = async function(userData) {
         // Save to database
         await db.ref('users/' + user.uid).set(userDbData);
         
-        console.log('✅ User registered:', user.uid);
+        // Sign out immediately after registration (user needs verification)
+        await auth.signOut();
+        
+        console.log('✅ User registered:', user.uid, 'Role:', role);
         return { user, userData: userDbData };
         
     } catch (error) {
@@ -83,6 +99,11 @@ window.registerUser = async function(userData) {
  */
 window.loginUser = async function(email, password) {
     try {
+        // Validate inputs
+        if (!email || !password) {
+            throw new Error('Email and password are required');
+        }
+        
         // Authenticate user
         const userCredential = await auth.signInWithEmailAndPassword(email, password);
         const user = userCredential.user;
@@ -92,16 +113,17 @@ window.loginUser = async function(email, password) {
         const userData = snapshot.val();
         
         if (!userData) {
-            throw new Error('User data not found in database');
+            await auth.signOut();
+            throw new Error('User data not found. Please contact support.');
         }
         
-        // Check if user is verified
+        // Check if user is verified (admin accounts are auto-verified)
         if (!userData.verified && userData.userType !== 'admin') {
             await auth.signOut();
             throw new Error('Your account is pending admin verification. Please wait for approval.');
         }
         
-        // Update last login
+        // Update last login timestamp
         await db.ref('users/' + user.uid).update({
             lastLogin: Date.now()
         });
@@ -166,7 +188,12 @@ window.redirectByRole = function(role) {
     
     const targetPage = roleRoutes[role];
     if (targetPage) {
-        window.location.href = targetPage;
+        // Check if we're already on the target page
+        const currentPage = window.location.pathname.split('/').pop();
+        if (currentPage !== targetPage) {
+            console.log('Redirecting to:', targetPage);
+            window.location.href = targetPage;
+        }
     } else {
         console.error('Unknown role:', role);
         window.location.href = '../index.html';
